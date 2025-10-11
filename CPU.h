@@ -26,8 +26,8 @@ public:
 	void ADDI(int rd, int rs, int imm);
 	void LUI();
 	void ORI(int rd, int rs, int imm);
-	void SLTIU();
-	void SRA();
+	void SLTIU(int rd, int rs, int imm);
+	void SRA(int rd, int rs1, int rs2);
 	void SUB(int rd, int rs1, int rs2);
 	void AND(int rd, int rs1, int rs2);
 	void LBU();

@@ -57,6 +57,27 @@ void CPU::SUB(int rd, int rs1, int rs2)
 	registers[rd] = registers[rs1] - registers[rs2];
 }
 
+void CPU::SRA(int rd, int rs1, int rs2)
+{
+	if (rd < 0 || rd >= 32 || rs1 < 0 || rs1 >= 32 || rs2 < 0 || rs2 >= 32) {
+		cerr << "Register index out of bounds in SRA" << endl;
+		return;
+	}
+	int shiftAmount = registers[rs2]; // RISC-V uses only the lower 5 bits for shift amount
+	registers[rd] = registers[rs1] >> shiftAmount; // Arithmetic right shift
+}
+
+void CPU::SLTIU(int rd, int rs, int imm) {
+	if (rd < 0 || rd >= 32 || rs < 0 || rs >= 32) {
+		cerr << "Register index out of bounds in SLTIU" << endl;
+		return;
+	}
+	uint rs_val = static_cast<uint>(registers[rs]);
+	uint imm_val = static_cast<uint>(imm);
+
+	registers[rd] = (rs_val < imm_val) ? 1 : 0;
+}
+
 int CPU::getRegister(int idx) const {
 	if (idx < 0 || idx >= 32) {
 		cerr << "Register index out of bounds in getRegister" << endl;
