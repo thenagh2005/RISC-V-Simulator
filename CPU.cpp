@@ -30,6 +30,17 @@ void CPU::ADDI(int rd, int rs, int imm)
 	registers[rd] = registers[rs] + imm;
 }
 
+//Implements the RISC-V AND instruction: rd = rs1 & rs2
+void CPU::AND(int rd, int rs1, int rs2) {
+	if (rd < 0 || rd >= 32 || rs1 < 0 || rs1 >= 32 || rs2 < 0 || rs2 >= 32) {
+		cerr << "Register index out of bounds in AND" << endl;
+		return;
+	}
+	registers[rd] = registers[rs1] & registers[rs2];
+}
+
+
+
 int CPU::getRegister(int idx) const {
 	if (idx < 0 || idx >= 32) {
 		cerr << "Register index out of bounds in getRegister" << endl;

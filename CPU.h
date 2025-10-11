@@ -29,7 +29,7 @@ public:
 	void SLTIU();
 	void SRA();
 	void SUB();
-	void AND();
+	void AND(int rd, int rs1, int rs2);
 	void LBU();
 	// Optionally, add methods to get/set registers for testing
 	int getRegister(int idx) const;
