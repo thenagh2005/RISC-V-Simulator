@@ -25,10 +25,10 @@ public:
 	void incPC();
 	void ADDI(int rd, int rs, int imm);
 	void LUI();
-	void ORI();
+	void ORI(int rd, int rs, int imm);
 	void SLTIU();
 	void SRA();
-	void SUB();
+	void SUB(int rd, int rs1, int rs2);
 	void AND(int rd, int rs1, int rs2);
 	void LBU();
 	// Optionally, add methods to get/set registers for testing
