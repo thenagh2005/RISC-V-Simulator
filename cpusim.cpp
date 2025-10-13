@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
 	// make sure to create a variable for PC and resets it to zero (e.g., unsigned int PC = 0); 
 
 	/* OPTIONAL: Instantiate your Instruction object here. */
-	//Instruction myInst; 
+	//instruction myInst; 
 	
 	bool done = true;
 	while (done == true) // processor's main loop. Each iteration is equal to one clock cycle.  

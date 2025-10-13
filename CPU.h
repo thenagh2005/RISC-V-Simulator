@@ -30,7 +30,11 @@ public:
 	void SRA(int rd, int rs1, int rs2);
 	void SUB(int rd, int rs1, int rs2);
 	void AND(int rd, int rs1, int rs2);
-	void LBU();
+	void LW(int rd, int rs1, int offset);
+	void SW(int rs2, int rs1, int offset);
+	void LBU(int rd, int rs1, int offset);
+	void BNE(int rs1, int rs2, int imm);
+	void JALR(int rd, int rs1, int offset);
 	// Optionally, add methods to get/set registers for testing
 	int getRegister(int idx) const;
 	void setRegister(int idx, int value);
