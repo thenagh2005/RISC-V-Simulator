@@ -33,7 +33,7 @@ ControlSignals controlUnit(uint32_t instr) {
             signals.Branch = false;
             signals.Jump = false;
             break;
-        case 0b0000011: // Load (e.g., LW, LBU)
+        case 0b0000011: // Load (e.g., LW, LBU, LUI)
             signals.RegWrite = true;
             signals.ALUSrc = true;
             signals.MemRead = true;
@@ -73,13 +73,5 @@ ControlSignals controlUnit(uint32_t instr) {
             signals.Branch = false;
             signals.Jump = true;
             break;
-        case 0b1101111: // JAL
-            signals.RegWrite = true;
-            signals.ALUSrc = false; // Don't care
-            signals.MemRead = false;
-            signals.MemWrite = false;
-            signals.MemtoReg = false; // PC + 4 to rd
-            signals.ALUOp = 0b00; // Don't care
-            signals.Branch = false;
-            signals.Jump = true;                
+    }                  
 }
