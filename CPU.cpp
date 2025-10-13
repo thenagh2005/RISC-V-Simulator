@@ -146,6 +146,14 @@ void CPU::JALR(int rd, int rs1, int offset) {
 	PC = (registers[rs1] + offset) & ~1;
 }
 
+void CPU::LUI(int rd, int imm) {
+	if (rd < 0 || rd >= 32) {
+		cerr << "Register index out of bounds in LUI" << endl;
+		return;
+	}
+	registers[rd] = imm << 12; // Load upper immediate
+}
+
 int CPU::getRegister(int idx) const {
 	if (idx < 0 || idx >= 32) {
 		cerr << "Register index out of bounds in getRegister" << endl;

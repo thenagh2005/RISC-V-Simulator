@@ -12,6 +12,7 @@ using namespace std;
 /*
 Add all the required standard and developed libraries here
 */
+#include "Control.h"
 
 /*
 Put/Define any helper function/definitions you need here
@@ -72,6 +73,8 @@ int main(int argc, char* argv[])
 		int funct7, funct3, rs1, rs2, rd, opcode;
 		int regWrite, ALUSrc, ALUOp, MemRead, MemWrite, MemtoReg, Branch;
 
+		string instrName = "NOP";
+
 		bitset<32> instruction;
 		unsigned long PC = myCPU.readPC();
 
@@ -86,12 +89,6 @@ int main(int argc, char* argv[])
 		instruction |= (instMem[PC * 4 + 2] << 16);
 		instruction |= (instMem[PC * 4 + 3] << 24);
 
-
-		opcode = (instruction.to_ulong() & 0x7F); //Extract opcode (bits 0-6)
-		funct3 = (instruction.to_ulong() >> 12) & 0x7;
-
-
-		
 		// decode
 		
 		// ... 

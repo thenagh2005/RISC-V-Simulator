@@ -24,7 +24,7 @@ public:
 	unsigned long readPC();
 	void incPC();
 	void ADDI(int rd, int rs, int imm);
-	void LUI();
+	void LUI(int rd, int imm);
 	void ORI(int rd, int rs, int imm);
 	void SLTIU(int rd, int rs, int imm);
 	void SRA(int rd, int rs1, int rs2);
