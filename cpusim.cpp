@@ -28,7 +28,6 @@ int main(int argc, char* argv[])
 
 	char instMem[4096];
 
-
 	if (argc < 2) {
 		//cout << "No file name entered. Exiting...";
 		return -1;
@@ -69,8 +68,26 @@ int main(int argc, char* argv[])
 	while (done == true) // processor's main loop. Each iteration is equal to one clock cycle.  
 	{
 		//fetch
-		
 
+		int funct7, funct3, rs1, rs2, rd, opcode;
+
+		bitset<32> instruction;
+		unsigned long PC = myCPU.readPC();
+
+		if (PC * 4 + 3 >= 4096) {
+			cerr << "PC out of bounds" << endl;
+			break;
+		}
+
+		//Get the instruction from instruction memory
+		instruction = instMem[PC * 4];
+		instruction |= (instMem[PC * 4 + 1] << 8);
+		instruction |= (instMem[PC * 4 + 2] << 16);
+		instruction |= (instMem[PC * 4 + 3] << 24);
+
+
+
+		
 		// decode
 		
 		// ... 
