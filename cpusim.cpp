@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
 
 		// decode
 
-		ControlSignals signals = controlUnit.decode(instruction);
+		ControlSignals signals = controlUnit.getSignals(instruction);
 
 		regWrite = signals.RegWrite;
 		ALUSrc = signals.ALUSrc;

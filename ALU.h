@@ -6,10 +6,12 @@
 using namespace std;
 
 enum class ALUOps {
-    ADD = 0b00,
-    SUB = 0b01,
-    AND = 0b10,
-    OR = 0b11,
+    ADD = 0b000,
+    SUB = 0b001,
+    AND = 0b010,
+    OR = 0b011,
+    A_R_SHIFT = 0b100,
+    L_SHIFT = 0b101
 };
 
 class ALU {

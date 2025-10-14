@@ -12,6 +12,15 @@ public:
 	instruction(bitset<32> fetch); // constructor
 };
 
+struct InstructionInfo
+{
+	u_int32_t read_register1;
+	u_int32_t read_register2;
+	u_int32_t write_register;
+	u_int32_t immediate;
+	string instruction_name;
+};
+
 class CPU
 {
 private:
@@ -23,6 +32,9 @@ public:
 	CPU();
 	unsigned long readPC();
 	void incPC();
+
+	void decode(bitset<32> instr);
+
 	void ADDI(int rd, int rs, int imm);
 	void LUI(int rd, int imm);
 	void ORI(int rd, int rs, int imm);
