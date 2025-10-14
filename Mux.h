@@ -5,9 +5,8 @@
 #include <string>
 using namespace std;
 
-class Mux {
-    public:
-        int32_t select(bool sel, int32_t input0, int32_t input1) {
-            return sel ? input1 : input0;
-        }
+class MUX
+{
+public:
+    int32_t select(bool sel, int32_t input0, int32_t input1);
 };
