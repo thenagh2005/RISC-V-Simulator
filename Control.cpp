@@ -67,7 +67,20 @@ ControlSignals ControlUnit::decode(const std::bitset<32> instr)
             signals.ALUOp = 0b01; // I-type operation
             break;
         }
-    break;    
+    break; 
+    case 0b0000011: // LW, LBU
+        funct3 = (instr.to_ulong() >> 12) & 0x7; // bits 12-14
+
+        signals.RegWrite = true;
+        signals.ALUSrc = true;
+        signals.MemRead = true;
+        signals.MemWrite = false;
+        signals.MemtoReg = true;
+        signals.Branch = false;
+        signals.ALUOp = 0b00; // I-type operation
+    break;
+
+        // funct3 can be used to differentiate between LW and LBU if needed   
     }
 
     return signals;
