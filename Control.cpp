@@ -8,8 +8,8 @@
 #include <string>
 using namespace std;    
 
-ControlSignals controlUnit(uint32_t instr) {
-    uint8_t opcode = instr & 0x7F; // Extract opcode (bits 0-6)
+ControlSignals ControlUnit::decode(const std::bitset<32> instr) {
+    uint8_t opcode = instr.to_ulong() & 0x7F; // Extract opcode (bits 0-6)
     ControlSignals signals = {};
 
     switch (opcode) {
@@ -73,5 +73,7 @@ ControlSignals controlUnit(uint32_t instr) {
             signals.Branch = false;
             signals.Jump = true;
             break;
-    }                  
+    } 
+    
+    return signals;
 }

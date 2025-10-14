@@ -15,3 +15,8 @@ struct ControlSignals {
     bool Branch;
     bool Jump;
 };
+
+class ControlUnit {
+    public:
+        ControlSignals decode(const std::bitset<32> instr);
+};

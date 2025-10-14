@@ -3,9 +3,9 @@
 #include <iostream>
 #include <bitset>
 #include <stdio.h>
-#include<stdlib.h>
+#include <stdlib.h>
 #include <string>
-#include<fstream>
+#include <fstream>
 #include <sstream>
 using namespace std;
 
@@ -17,7 +17,7 @@ Add all the required standard and developed libraries here
 /*
 Put/Define any helper function/definitions you need here
 */
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
 	/* This is the front end of your project.
 	You need to first read the instructions that are stored in a file and load them into an instruction memory.
@@ -29,78 +29,81 @@ int main(int argc, char* argv[])
 
 	char instMem[4096];
 
-	if (argc < 2) {
-		//cout << "No file name entered. Exiting...";
+	if (argc < 2)
+	{
+		// cout << "No file name entered. Exiting...";
 		return -1;
 	}
 
-	ifstream infile(argv[1]); //open the file
-	if (!(infile.is_open() && infile.good())) {
-		cout<<"error opening file\n";
-		return 0; 
+	ifstream infile(argv[1]); // open the file
+	if (!(infile.is_open() && infile.good()))
+	{
+		cout << "error opening file\n";
+		return 0;
 	}
-	string line; 
+	string line;
 	int i = 0;
-	while (infile) {
-			infile>>line;
-			stringstream line2(line);
-			char x; 
-			line2>>x;
-			instMem[i] = x; // be careful about hex
-			i++;
-			line2>>x;
-			instMem[i] = x; // be careful about hex
-			cout<<instMem[i]<<endl;
-			i++;
-		}
-	int maxPC= i/4; 
+	while (infile)
+	{
+		infile >> line;
+		stringstream line2(line);
+		char x;
+		line2 >> x;
+		instMem[i] = x; // be careful about hex
+		i++;
+		line2 >> x;
+		instMem[i] = x; // be careful about hex
+		cout << instMem[i] << endl;
+		i++;
+	}
+	int maxPC = i / 4;
 
 	/* Instantiate your CPU object here.  CPU class is the main class in this project that defines different components of the processor.
 	CPU class also has different functions for each stage (e.g., fetching an instruction, decoding, etc.).
 	*/
 
-	CPU myCPU;  // call the approriate constructor here to initialize the processor...  
-	// make sure to create a variable for PC and resets it to zero (e.g., unsigned int PC = 0); 
+	CPU myCPU; // call the approriate constructor here to initialize the processor...
+	// make sure to create a variable for PC and resets it to zero (e.g., unsigned int PC = 0);
 
 	/* OPTIONAL: Instantiate your Instruction object here. */
-	//instruction myInst; 
-	
+	// instruction myInst;
+
 	bool done = true;
-	while (done == true) // processor's main loop. Each iteration is equal to one clock cycle.  
+	while (done == true) // processor's main loop. Each iteration is equal to one clock cycle.
 	{
-		//fetch
+		// fetch
 
 		int funct7, funct3, rs1, rs2, rd, opcode;
 		int regWrite, ALUSrc, ALUOp, MemRead, MemWrite, MemtoReg, Branch;
 
 		string instrName = "NOP";
 
-		bitset<32> instruction;
 		unsigned long PC = myCPU.readPC();
 
-		if (PC * 4 + 3 >= 4096) {
+		if (PC * 4 + 3 >= 4096)
+		{
 			cerr << "PC out of bounds" << endl;
 			break;
 		}
 
-		//Get the instruction from instruction memory
-		instruction = instMem[PC * 4];
-		instruction |= (instMem[PC * 4 + 1] << 8);
-		instruction |= (instMem[PC * 4 + 2] << 16);
-		instruction |= (instMem[PC * 4 + 3] << 24);
+		bitset<32> instruction(
+			instMem[PC * 4] |
+			(instMem[PC * 4 + 1] << 8) |
+			(instMem[PC * 4 + 2] << 16) |
+			(instMem[PC * 4 + 3] << 24)
+		);
 
 		// decode
-		
-		// ... 
+
+		// ...
 		myCPU.incPC();
 		if (myCPU.readPC() > maxPC)
 			break;
 	}
-	int a0 =0;
-	int a1 =0;  
+	int a0 = 0;
+	int a1 = 0;
 	// print the results (you should replace a0 and a1 with your own variables that point to a0 and a1)
-	  cout << "(" << a0 << "," << a1 << ")" << endl;
-	
-	return 0;
+	cout << "(" << a0 << "," << a1 << ")" << endl;
 
+	return 0;
 }
