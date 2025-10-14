@@ -64,6 +64,8 @@ int main(int argc, char *argv[])
 
 	CPU myCPU; // call the approriate constructor here to initialize the processor...
 	// make sure to create a variable for PC and resets it to zero (e.g., unsigned int PC = 0);
+	unsigned int PC = 0;
+	ControlUnit controlUnit;
 
 	/* OPTIONAL: Instantiate your Instruction object here. */
 	// instruction myInst;
@@ -94,6 +96,16 @@ int main(int argc, char *argv[])
 		);
 
 		// decode
+
+		ControlSignals signals = controlUnit.decode(instruction);
+
+		regWrite = signals.RegWrite;
+		ALUSrc = signals.ALUSrc;
+		MemRead = signals.MemRead;
+		MemWrite = signals.MemWrite;
+		MemtoReg = signals.MemtoReg;
+		ALUOp = signals.ALUOp;
+		Branch = signals.Branch;
 
 		// ...
 		myCPU.incPC();
