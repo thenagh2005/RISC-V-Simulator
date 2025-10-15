@@ -79,8 +79,36 @@ ControlSignals ControlUnit::getSignals(const std::bitset<32> instr)
         signals.Branch = false;
         signals.ALUOp = 0b000; // I-type operation
     break;
-    case 0b0100011: // SW
-        // funct3 can be used to differentiate between LW and LBU if needed   
+    case 0b0100011: // SW, SH
+        // funct3 can be used to differentiate between LW and LBU if needed  
+        signals.RegWrite = false;
+        signals.ALUSrc = true;
+        signals.MemRead = false;
+        signals.MemWrite = true; 
+        signals.MemtoReg = false;
+        signals.Branch = false;
+        signals.ALUOp = 0b000; // S-type operation
+
+    break;
+    case 0b1100011: // BNE
+        funct3 = (instr.to_ulong() >> 12) & 0x7; // bits 12-14
+
+        signals.RegWrite = false;
+        signals.ALUSrc = false;
+        signals.MemRead = false;
+        signals.MemWrite = false;
+        signals.MemtoReg = false;
+        signals.Branch = true;
+        signals.ALUOp = 0b001; // B-type operation
+    break;
+    case 0b1100111: // JALR
+        signals.RegWrite = true;
+        signals.ALUSrc = true;
+        signals.MemRead = false;
+        signals.MemWrite = false;
+        signals.MemtoReg = false;
+        signals.Branch = false;
+        signals.ALUOp = 0b000; // I-type operation
     break;
     }
 

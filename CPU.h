@@ -32,8 +32,9 @@ public:
 	CPU();
 	unsigned long readPC();
 	void incPC();
+	void setPC(unsigned long newPC);
 
-	void decode(bitset<32> instr);
+	InstructionInfo decode(bitset<32> instr);
 
 	void ADDI(int rd, int rs, int imm);
 	void LUI(int rd, int imm);
