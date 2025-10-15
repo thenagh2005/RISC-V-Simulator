@@ -14,8 +14,13 @@ enum class ALUOps {
     L_SHIFT = 0b101
 };
 
+/*
+ALUOps get_op_from_bin(int binary) {
+    return static_cast<ALUOps>(binary);
+}*/
+
 class ALU {
     public:
-        int32_t compute(ALUOps op, int32_t operand1, int32_t operand2);
+        int32_t compute(int op, int32_t operand1, int32_t operand2);
 
 };

@@ -110,6 +110,14 @@ ControlSignals ControlUnit::getSignals(const std::bitset<32> instr)
         signals.Branch = false;
         signals.ALUOp = 0b000; // I-type operation
     break;
+    case 0b0110111: //LUI
+        signals.RegWrite = true;
+        signals.ALUSrc = true;
+        signals.MemRead = false;
+        signals.MemWrite = false;
+        signals.MemtoReg = false;
+        signals.Branch = false;
+        signals.ALUOp = 0b101;
     }
 
     return signals;

@@ -14,11 +14,11 @@ public:
 
 struct InstructionInfo
 {
-	u_int32_t read_register1;
-	u_int32_t read_register2;
-	u_int32_t write_register;
-	u_int32_t immediate;
-	string instruction_name;
+	u_int32_t read_register1 = -1;
+	u_int32_t read_register2 = -1;
+	u_int32_t write_register = -1;
+	int32_t immediate = -1;
+	string instruction_name = "NOP";
 };
 
 class CPU
@@ -33,6 +33,30 @@ public:
 	unsigned long readPC();
 	void incPC();
 	void setPC(unsigned long newPC);
+
+	int loadWord(int address) {
+
+	}
+
+	int storeWord(int address, int value) {
+
+	}
+
+	int loadByte(int address) {
+
+	}
+
+	int storeByte(int address, int value) {
+
+	}
+
+	int loadHalfWord(int address) {
+
+	}
+
+	int storeHalfWord(int address, int value) {
+
+	}
 
 	InstructionInfo decode(bitset<32> instr);
 

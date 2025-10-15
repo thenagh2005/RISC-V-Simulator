@@ -110,6 +110,7 @@ int main(int argc, char *argv[])
         bitset<32> instructionBits(instr32);
 
         //cout << "Instruction " << pc << ": 0x" << hex << instr32 << "  " << instructionBits << endl;
+		
     }
 
 	for (int j = 0; j < i; j++)
@@ -134,7 +135,9 @@ int main(int argc, char *argv[])
 	MUX mux3; // MUX that selects between PC+4 and branch target for next PC value
 
 	int funct7, funct3, rs1, rs2, rd, opcode;
-	int regWrite, ALUSrc, ALUOp, MemRead, MemWrite, MemtoReg, Branch;
+	int regWrite, ALUSrc, MemRead, MemWrite, MemtoReg, Branch;
+
+	int ALUOp;
 
 	/* OPTIONAL: Instantiate your Instruction object here. */
 	// instruction myInst;
@@ -143,8 +146,6 @@ int main(int argc, char *argv[])
 	while (done == true) // processor's main loop. Each iteration is equal to one clock cycle.
 	{
 		// fetch
-
-		string instrName = "NOP";
 
 		unsigned long PC = myCPU.readPC();
 
@@ -176,8 +177,13 @@ int main(int argc, char *argv[])
 		ControlSignals signals = controlUnit.getSignals(instruction); // Got the control signals
 		InstructionInfo info = myCPU.decode(instruction);			  // Decoded the instruction
 
-		instrName = info.instruction_name;
-		regWrite = signals.RegWrite;
+		string instrName = info.instruction_name;
+		uint32_t rdName = info.write_register;
+		uint32_t rs1Name = info.read_register1;
+		uint32_t rs2Name = info.read_register2;
+		int32_t imm = info.immediate;
+
+		regWrite = signals.RegWrite; //Load the control signals into variables
 		ALUSrc = signals.ALUSrc;
 		MemRead = signals.MemRead;
 		MemWrite = signals.MemWrite;
@@ -185,7 +191,37 @@ int main(int argc, char *argv[])
 		ALUOp = signals.ALUOp;
 		Branch = signals.Branch;
 
-		cout << instrName << endl;
+		cout << instrName << ", " << rdName << ", " << rs1Name << ", " << rs2Name << ", " << imm << endl;
+
+		//Begin cycle
+		int read_data1 = 0;
+		int read_data2 = 0;
+
+		if (rs1Name != -1) {
+			read_data1 = myCPU.getRegister(rs1Name);
+		}
+		if (rs2Name != -1) {
+			read_data2 = myCPU.getRegister(rs2Name);
+		}
+
+		int32_t alu_input1 = read_data1;
+		int32_t alu_input2 = mux1.select(ALUSrc, read_data2, imm);
+
+		if (instrName == "LUI") {
+			int alu_input1 = 12; //If LUI, shift immediate by 12 bits
+			int alu_result = alu1.compute(ALUOp, alu_input2, alu_input1);
+		} else {
+			int32_t alu_result = alu1.compute(ALUOp, alu_input1, alu_input2);
+		}
+
+		
+
+
+
+
+
+
+
 
 		// ...
 		myCPU.incPC();

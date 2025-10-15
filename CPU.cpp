@@ -324,6 +324,14 @@ InstructionInfo CPU::decode(bitset<32> instr)
 		info.immediate = imm;
 
 		break;	
+	case 0b0110111:
+		info.instruction_name = "LUI";
+
+		info.write_register = (instr.to_ulong() >> 7) & 0x1F;	 // Get write_register
+		imm = (instr.to_ulong() >> 12) & 0xFFFFF;
+
+		info.immediate = imm;
+		break;
 	}
 
 	return info;
@@ -333,6 +341,7 @@ int CPU::getRegister(int idx) const
 {
 	if (idx < 0 || idx >= 32)
 	{
+		cerr << idx << endl;
 		cerr << "Register index out of bounds in getRegister" << endl;
 		return 0;
 	}
