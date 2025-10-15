@@ -1,4 +1,3 @@
-#include "CPU.h"
 
 #include <iostream>
 #include <bitset>
@@ -13,10 +12,25 @@ using namespace std;
 Add all the required standard and developed libraries here
 */
 #include "Control.h"
+#include "CPU.h"
+#include "ALU.h"
+#include "MUX.h"
 
 /*
 Put/Define any helper function/definitions you need here
 */
+
+unsigned char hexCharToByte(char c)
+{
+	if (c >= '0' && c <= '9')
+		return c - '0';
+	if (c >= 'a' && c <= 'f')
+		return 10 + (c - 'a');
+	if (c >= 'A' && c <= 'F')
+		return 10 + (c - 'A');
+	return 0;
+}
+
 int main(int argc, char *argv[])
 {
 	/* This is the front end of your project.
@@ -41,6 +55,7 @@ int main(int argc, char *argv[])
 		cout << "error opening file\n";
 		return 0;
 	}
+
 	string line;
 	int i = 0;
 	while (infile)
@@ -53,10 +68,54 @@ int main(int argc, char *argv[])
 		i++;
 		line2 >> x;
 		instMem[i] = x; // be careful about hex
-		cout << instMem[i] << endl;
+		//cout << instMem[i] << endl;
 		i++;
 	}
 	int maxPC = i / 4;
+	/*
+	string line;
+	int i = 0;
+	while (infile)
+	{
+		infile >> line;
+		if (line.empty())
+			continue; // skip empty lines
+
+		unsigned int val;
+		stringstream line2(line);
+		line2 >> hex >> val; // convert ASCII hex to numeric byte
+
+		instMem[i] = static_cast<unsigned char>(val & 0xFF);
+		//cout << "Loaded byte " << i << ": 0x" << hex << val << dec << endl;
+		i++;
+	}*/
+	//int maxPC = i / 4;
+
+	for (int pc = 0; pc < maxPC; ++pc) {
+        int idx = pc * 8;
+        unsigned char bytes[4];
+
+        // convert each pair of ASCII chars to a numeric byte
+        for (int i = 0; i < 4; ++i) {
+            bytes[i] = (hexCharToByte(instMem[idx + 2*i]) << 4) | hexCharToByte(instMem[idx + 2*i + 1]);
+        }
+
+        // assemble into 32-bit instruction (little-endian)
+        uint32_t instr32 =
+            (uint32_t)bytes[0] |
+            ((uint32_t)bytes[1] << 8) |
+            ((uint32_t)bytes[2] << 16) |
+            ((uint32_t)bytes[3] << 24);
+
+        bitset<32> instructionBits(instr32);
+
+        //cout << "Instruction " << pc << ": 0x" << hex << instr32 << "  " << instructionBits << endl;
+    }
+
+	for (int j = 0; j < i; j++)
+	{
+		//cout << "Hello " << (unsigned char)instMem[j] << endl;
+	}
 
 	/* Instantiate your CPU object here.  CPU class is the main class in this project that defines different components of the processor.
 	CPU class also has different functions for each stage (e.g., fetching an instruction, decoding, etc.).
@@ -66,6 +125,16 @@ int main(int argc, char *argv[])
 	// make sure to create a variable for PC and resets it to zero (e.g., unsigned int PC = 0);
 	unsigned int PC = 0;
 	ControlUnit controlUnit;
+	ALU alu1; // ALU that is between registers and data memory
+	ALU alu2; // ALU that is used for branch calculations
+	ALU alu3; // ALU that is used to calculate the new PC value when a jump instruction is encountered
+
+	MUX mux1; // MUX that selects between immediate and register value for ALU input
+	MUX mux2; // MUX that selects between ALU result and data memory output for writing
+	MUX mux3; // MUX that selects between PC+4 and branch target for next PC value
+
+	int funct7, funct3, rs1, rs2, rd, opcode;
+	int regWrite, ALUSrc, ALUOp, MemRead, MemWrite, MemtoReg, Branch;
 
 	/* OPTIONAL: Instantiate your Instruction object here. */
 	// instruction myInst;
@@ -74,9 +143,6 @@ int main(int argc, char *argv[])
 	while (done == true) // processor's main loop. Each iteration is equal to one clock cycle.
 	{
 		// fetch
-
-		int funct7, funct3, rs1, rs2, rd, opcode;
-		int regWrite, ALUSrc, ALUOp, MemRead, MemWrite, MemtoReg, Branch;
 
 		string instrName = "NOP";
 
@@ -88,17 +154,29 @@ int main(int argc, char *argv[])
 			break;
 		}
 
-		bitset<32> instruction(
-			instMem[PC * 4] |
-			(instMem[PC * 4 + 1] << 8) |
-			(instMem[PC * 4 + 2] << 16) |
-			(instMem[PC * 4 + 3] << 24)
-		);
+		int idx = PC * 8;
+        unsigned char bytes[4];
 
-		// decode
+        // convert each pair of ASCII chars to a numeric byte
+        for (int i = 0; i < 4; ++i) {
+            bytes[i] = (hexCharToByte(instMem[idx + 2*i]) << 4) | hexCharToByte(instMem[idx + 2*i + 1]);
+        }
 
-		ControlSignals signals = controlUnit.getSignals(instruction);
+        // assemble into 32-bit instruction (little-endian)
+        uint32_t instr32 =
+            (uint32_t)bytes[0] |
+            ((uint32_t)bytes[1] << 8) |
+            ((uint32_t)bytes[2] << 16) |
+            ((uint32_t)bytes[3] << 24);
 
+        bitset<32> instruction(instr32);
+
+        cout << "Instruction " << PC << ": 0x" << hex << instr32 << "  " << instruction << endl;
+
+		ControlSignals signals = controlUnit.getSignals(instruction); // Got the control signals
+		InstructionInfo info = myCPU.decode(instruction);			  // Decoded the instruction
+
+		instrName = info.instruction_name;
 		regWrite = signals.RegWrite;
 		ALUSrc = signals.ALUSrc;
 		MemRead = signals.MemRead;
@@ -106,6 +184,8 @@ int main(int argc, char *argv[])
 		MemtoReg = signals.MemtoReg;
 		ALUOp = signals.ALUOp;
 		Branch = signals.Branch;
+
+		cout << instrName << endl;
 
 		// ...
 		myCPU.incPC();

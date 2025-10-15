@@ -11,7 +11,7 @@ struct ControlSignals {
     bool MemRead;
     bool MemWrite;
     bool MemtoReg;
-    int ALUOp; // 2-bit control signal
+    int ALUOp; // 3-bit control signal
     bool Branch;
     bool Jump;
 };

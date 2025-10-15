@@ -189,6 +189,8 @@ InstructionInfo CPU::decode(bitset<32> instr)
 
 	uint8_t funct3, funct7;
 
+	int32_t imm;
+
 	switch (opcode)
 	{
 	case 0b0110011:								 // SRA, SUB, AND
@@ -223,7 +225,7 @@ InstructionInfo CPU::decode(bitset<32> instr)
 
 		info.read_register1 = (instr.to_ulong() >> 15) & 0x1F; // Get read_register1
 		info.write_register = (instr.to_ulong() >> 7) & 0x1F;	 // Get write_register
-		int32_t imm = (instr.to_ulong() >> 20) & 0xFFF;		 // Get immediate
+		imm = (instr.to_ulong() >> 20) & 0xFFF;		 // Get immediate
 
 		if (imm & 0x800) {
 			imm |= 0xFFFFF000;
@@ -251,13 +253,13 @@ InstructionInfo CPU::decode(bitset<32> instr)
 
 		info.read_register1 = (instr.to_ulong() >> 15) & 0x1F;
 		info.write_register = (instr.to_ulong() >> 7)& 0x1F;
-		int32_t imm2 = (instr.to_ulong() >> 20) & 0xFFF;
+		imm = (instr.to_ulong() >> 20) & 0xFFF;
 
-		if (imm2 & 0x800) {
-			imm2 |= 0xFFFFF000;
+		if (imm & 0x800) {
+			imm |= 0xFFFFF000;
 		}
 
-		info.immediate = imm2;
+		info.immediate = imm;
 
 		switch (funct3)
 		{
@@ -276,13 +278,13 @@ InstructionInfo CPU::decode(bitset<32> instr)
 
 		info.read_register1 = (instr.to_ulong() >> 15) & 0x1F;
 		info.read_register2 = (instr.to_ulong() >> 20) & 0x1F;
-		int32_t imm3 = ((instr.to_ulong()) >> 7) & 0x1F;
-		imm3 |= ((instr.to_ulong() >> 25) & 0x7F) << 5;
-		if (imm3 & 0x800) {
-			imm3 |= 0xFFFFF000;
+		imm = ((instr.to_ulong()) >> 7) & 0x1F;
+		imm |= ((instr.to_ulong() >> 25) & 0x7F) << 5;
+		if (imm & 0x800) {
+			imm |= 0xFFFFF000;
 		}
 
-		info.immediate = imm3;
+		info.immediate = imm;
 
 		switch (funct3)
 		{
@@ -299,14 +301,14 @@ InstructionInfo CPU::decode(bitset<32> instr)
 
 		info.read_register1 = instr.to_ulong() >> 15 & 0x1F;
 		info.read_register2 = instr.to_ulong() >> 20 & 0x1F;
-		int32_t imm4 = ((instr.to_ulong()) >> 7) & 0x1E;
-		imm4 |= (((instr.to_ulong()) >> 25) & 0x3F) << 5;
-		imm4 |= (((instr.to_ulong()) >> 31) & 0x1) << 11;
-		imm4 |= (((instr.to_ulong()) >> 7) & 0x1) << 12;
-		if (imm4 & 0x1000) {
-			imm4 |= 0xFFFFE000;
+		imm = ((instr.to_ulong()) >> 7) & 0x1E;
+		imm |= (((instr.to_ulong()) >> 25) & 0x3F) << 5;
+		imm |= (((instr.to_ulong()) >> 31) & 0x1) << 11;
+		imm |= (((instr.to_ulong()) >> 7) & 0x1) << 12;
+		if (imm & 0x1000) {
+			imm |= 0xFFFFE000;
 		}
-		info.immediate = imm4;
+		info.immediate = imm;
 
 		break;
 	case 0b1100111: // JALR
@@ -314,7 +316,7 @@ InstructionInfo CPU::decode(bitset<32> instr)
 
 		info.read_register1 = (instr.to_ulong() >> 15) & 0x1F; // Get read_register1
 		info.write_register = (instr.to_ulong() >> 7) & 0x1F;	 // Get write_register
-		int32_t imm = (instr.to_ulong() >> 20) & 0xFFF;		 // Get immediate
+		imm = (instr.to_ulong() >> 20) & 0xFFF;		 // Get immediate
 
 		if (imm & 0x800) {
 			imm |= 0xFFFFF000;
