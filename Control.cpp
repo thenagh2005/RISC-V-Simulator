@@ -28,6 +28,7 @@ ControlSignals ControlUnit::getSignals(const std::bitset<32> instr)
         signals.MemWrite = false;
         signals.MemtoReg = false;
         signals.Branch = false;
+        signals.size = 0b11;
 
         switch (funct3)
         {
@@ -54,6 +55,7 @@ ControlSignals ControlUnit::getSignals(const std::bitset<32> instr)
         signals.MemWrite = false;
         signals.MemtoReg = false;
         signals.Branch = false;
+        signals.size = 0b11;
 
         switch (funct3)
         {
@@ -78,9 +80,21 @@ ControlSignals ControlUnit::getSignals(const std::bitset<32> instr)
         signals.MemtoReg = true;
         signals.Branch = false;
         signals.ALUOp = 0b000; // I-type operation
+
+        switch (funct3)
+        {
+            case 0b010: // LW
+                signals.size = 0b10;
+            break;
+            case 0b100: // LBU
+                signals.size = 0b00;
+            break;
+        }
     break;
     case 0b0100011: // SW, SH
         // funct3 can be used to differentiate between LW and LBU if needed  
+        funct3 = (instr.to_ulong() >> 12) & 0x7; // bits 12-14
+
         signals.RegWrite = false;
         signals.ALUSrc = true;
         signals.MemRead = false;
@@ -88,6 +102,16 @@ ControlSignals ControlUnit::getSignals(const std::bitset<32> instr)
         signals.MemtoReg = false;
         signals.Branch = false;
         signals.ALUOp = 0b000; // S-type operation
+
+        switch(funct3)
+        {
+            case 0b010: // SW
+                signals.size = 0b10;
+            break;
+            case 0b001: // SH
+                signals.size = 0b01;
+            break;
+        }
 
     break;
     case 0b1100011: // BNE
@@ -118,6 +142,8 @@ ControlSignals ControlUnit::getSignals(const std::bitset<32> instr)
         signals.MemtoReg = false;
         signals.Branch = false;
         signals.ALUOp = 0b101;
+        signals.size = 0b11;
+        break;
     }
 
     return signals;

@@ -13,6 +13,7 @@ struct ControlSignals {
     bool MemtoReg;
     int ALUOp; // 3-bit control signal
     bool Branch;
+    int size; // 2 - bits: 00 - byte, 01 - halfword, 10 - word, 11 - irrelevant
     bool Jump;
 };
 

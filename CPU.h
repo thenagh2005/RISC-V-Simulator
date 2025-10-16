@@ -24,8 +24,8 @@ struct InstructionInfo
 class CPU
 {
 private:
-	int dmemory[4096]; // data memory byte addressable in little endian fashion;
-	unsigned long PC;  // pc
+	int dmemory[1000000];	 // data memory byte addressable in little endian fashion;
+	unsigned long PC;		 // pc
 	int registers[32] = {0}; // 32 general-purpose registers
 
 public:
@@ -34,28 +34,104 @@ public:
 	void incPC();
 	void setPC(unsigned long newPC);
 
-	int loadWord(int address) {
+	int loadWord(int address)
+	{
+		if (address % 4 != 0)
+		{
+			cerr << "Memory out of bounds" << endl;
+			return 0;
+		}
+		/*
+		int word = (dmemory[address] & 0xFF) |
+			   ((dmemory[address + 1] & 0xFF) << 8) |
+			   ((dmemory[address + 2] & 0xFF) << 16) |
+			   ((dmemory[address + 3] & 0xFF) << 24);*/
 
+		int word = dmemory[address / 4];
+
+		return word;
 	}
 
-	int storeWord(int address, int value) {
+	int storeWord(int address, int value)
+	{
+		if (address % 4 != 0)
+		{
+			cerr << "Memory out of bounds" << endl;
+			return -1;
+		}
+		/*
+		dmemory[address] = value & 0xFF;
+		dmemory[address + 1] = (value >> 8) & 0xFF;
+		dmemory[address + 2] = (value >> 16) & 0xFF;
+		dmemory[address + 3] = (value >> 24) & 0xFF;*/
 
+		dmemory[address / 4] = value;
+		return 0;
 	}
 
-	int loadByte(int address) {
+	int loadByte(int address)
+	{
+		int wordIndex = address / 4;  // which word
+		int byteOffset = address % 4; // which byte (0–3)
 
+		uint32_t word = dmemory[wordIndex];
+		int8_t byte = (word >> (8 * byteOffset)) & 0xFF; // extract byte
+
+		return (int32_t)byte; // sign-extend to 32 bits
 	}
 
-	int storeByte(int address, int value) {
+	uint32_t loadByteU(int address) {
+		int wordIndex = address / 4;
+		int byteOffset = address % 4;
 
+		uint32_t word = dmemory[wordIndex];
+		uint32_t byte = (word >> (8 * byteOffset)) & 0xFF;
+		return (uint32_t)byte; // zero-extend to 32 bits
 	}
 
-	int loadHalfWord(int address) {
+	int storeByte(int address, int value)
+	{
+		int wordIndex = address / 4;  // which word
+		int byteOffset = address % 4; // which byte inside word
 
+		uint32_t mask = 0xFF << (8 * byteOffset); // mask for target byte
+		uint32_t newByte = (value & 0xFF) << (8 * byteOffset);
+
+		dmemory[wordIndex] = (dmemory[wordIndex] & ~mask) | newByte;
 	}
 
-	int storeHalfWord(int address, int value) {
+	int loadHalfWord(int address)
+	{
+		if (address % 2 != 0)
+		{
+			std::cerr << "Misaligned LH at address " << address << std::endl;
+			exit(1); // RISC-V forbids misaligned halfword access
+		}
 
+		int wordIndex = address / 4;
+		int halfOffset = (address % 4) / 2;
+
+		uint32_t word = dmemory[wordIndex];
+		int16_t half = (word >> (16 * halfOffset)) & 0xFFFF;
+
+		return (int32_t)half; // sign-extend to 32 bits
+	}
+
+	int storeHalfWord(int address, int value)
+	{
+		if (address % 2 != 0)
+		{
+			std::cerr << "Misaligned SH at address " << address << std::endl;
+			exit(1); // RISC-V forbids misaligned halfword access
+		}
+
+		int wordIndex = address / 4;
+		int halfOffset = (address % 4) / 2;
+
+		uint32_t mask = 0xFFFF << (16 * halfOffset);
+		uint32_t newHalf = (value & 0xFFFF) << (16 * halfOffset);
+
+		dmemory[wordIndex] = (dmemory[wordIndex] & ~mask) | newHalf;
 	}
 
 	InstructionInfo decode(bitset<32> instr);

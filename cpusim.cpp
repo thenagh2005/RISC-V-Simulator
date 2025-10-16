@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
 	MUX mux3; // MUX that selects between PC+4 and branch target for next PC value
 
 	int funct7, funct3, rs1, rs2, rd, opcode;
-	int regWrite, ALUSrc, MemRead, MemWrite, MemtoReg, Branch;
+	int regWrite, ALUSrc, MemRead, MemWrite, MemtoReg, Branch, size;
 
 	int ALUOp;
 
@@ -172,7 +172,7 @@ int main(int argc, char *argv[])
 
         bitset<32> instruction(instr32);
 
-        cout << "Instruction " << PC << ": 0x" << hex << instr32 << "  " << instruction << endl;
+        //cout << "Instruction " << PC << ": 0x" << hex << instr32 << "  " << instruction << endl;
 
 		ControlSignals signals = controlUnit.getSignals(instruction); // Got the control signals
 		InstructionInfo info = myCPU.decode(instruction);			  // Decoded the instruction
@@ -190,12 +190,48 @@ int main(int argc, char *argv[])
 		MemtoReg = signals.MemtoReg;
 		ALUOp = signals.ALUOp;
 		Branch = signals.Branch;
+		size = signals.size;
 
-		cout << instrName << ", " << rdName << ", " << rs1Name << ", " << rs2Name << ", " << imm << endl;
+		/*
+
+		int32_t reg1 = myCPU.getRegister(rs1Name);
+		int32_t reg2 = myCPU.getRegister(rs2Name);
+
+		int32_t aluB = mux1.select(ALUSrc, reg2, imm);
+
+		int32_t aluResult = alu1.compute(ALUOp, reg1, aluB);
+
+		int32_t memData = 0;
+
+		if (MemRead) {
+			if (size == 0b00) {
+				memData = myCPU.loadByte(aluResult);
+			} else if (size == 0b10) {
+				memData = myCPU.loadWord(aluResult);
+			}
+		}
+
+		if (MemWrite) {
+			if (size == 0b01) {
+				myCPU.storeHalfWord(aluResult, reg2);
+			} else if (size == 0b10) {
+				myCPU.storeWord(aluResult, reg2);
+			}
+		}
+
+		if (regWrite) {
+			int32_t writeData = mux2.select(MemtoReg, aluResult, memData);
+			myCPU.setRegister(rdName, writeData);
+		}*/
+
+		
+		//cout << instrName << ", " << rdName << ", " << rs1Name << ", " << rs2Name << ", " << imm << endl;
 
 		//Begin cycle
 		int read_data1 = 0;
 		int read_data2 = 0;
+
+		int from_memory = 0;
 
 		if (rs1Name != -1) {
 			read_data1 = myCPU.getRegister(rs1Name);
@@ -206,32 +242,58 @@ int main(int argc, char *argv[])
 
 		int32_t alu_input1 = read_data1;
 		int32_t alu_input2 = mux1.select(ALUSrc, read_data2, imm);
+		int32_t alu_result;
 
 		if (instrName == "LUI") {
 			int alu_input1 = 12; //If LUI, shift immediate by 12 bits
-			int alu_result = alu1.compute(ALUOp, alu_input2, alu_input1);
+			alu_result = alu1.compute(ALUOp, alu_input2, alu_input1);
 		} else {
-			int32_t alu_result = alu1.compute(ALUOp, alu_input1, alu_input2);
+			alu_result = alu1.compute(ALUOp, alu_input1, alu_input2);
+		}
+
+		//Now memory
+		
+		if (MemRead) {
+			if (size == 0b00) { // LBU
+				from_memory = myCPU.loadByte(alu_result);
+				cout << "Loaded from memory: " << alu_result << endl;
+			} else if (size == 0b10) { // LW
+				from_memory = myCPU.loadWord(alu_result);
+				cout << "Loaded from memory: " << alu_result << endl;
+			}
+		}
+
+		int32_t write_data = mux2.select(MemtoReg, alu_result, from_memory);
+
+		int32_t mem_write_data = read_data2;
+
+		
+		if (regWrite && rdName != -1) {
+			myCPU.setRegister(rdName, write_data);
+		}
+
+		if (MemWrite) {
+			if (size == 0b10) { // SW
+				myCPU.storeWord(alu_result, mem_write_data);
+				cout << "Stored to memory: " << alu_result << " value: " << mem_write_data << endl;
+			} else if (size == 0b01) { // SH
+				myCPU.storeHalfWord(alu_result, mem_write_data);
+				cout << "Stored to memory: " << alu_result << " value: " << mem_write_data << endl;
+			} 
 		}
 
 		
-
-
-
-
-
-
-
-
 		// ...
 		myCPU.incPC();
 		if (myCPU.readPC() > maxPC)
 			break;
 	}
+
+	cout << myCPU.getRegister(10) << " " << myCPU.getRegister(11) << endl;
 	int a0 = 0;
 	int a1 = 0;
 	// print the results (you should replace a0 and a1 with your own variables that point to a0 and a1)
-	cout << "(" << a0 << "," << a1 << ")" << endl;
+	cout << "(" << myCPU.getRegister(10) << "," << myCPU.getRegister(11) << ")" << endl;
 
 	return 0;
 }
