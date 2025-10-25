@@ -1,4 +1,5 @@
 
+
 #include <iostream>
 #include <bitset>
 #include <stdio.h>
@@ -6,6 +7,7 @@
 #include <string>
 #include <fstream>
 #include <sstream>
+#include <vector>
 using namespace std;
 
 /*
@@ -15,6 +17,122 @@ Add all the required standard and developed libraries here
 #include "CPU.h"
 #include "ALU.h"
 #include "MUX.h"
+
+static inline bool isHexChar(char c)
+{
+	return (c >= '0' && c <= '9') ||
+		   (c >= 'a' && c <= 'f') ||
+		   (c >= 'A' && c <= 'F');
+}
+static inline int hexVal(char c)
+{
+	if (c >= '0' && c <= '9')
+		return c - '0';
+	if (c >= 'a' && c <= 'f')
+		return 10 + (c - 'a');
+	if (c >= 'A' && c <= 'F')
+		return 10 + (c - 'A');
+	return 0;
+}
+
+static inline uint32_t parseHex(const string &s)
+{
+	uint32_t v = 0;
+	for (char c : s)
+	{
+		v = (v << 4) | hexVal(c);
+	}
+	return v;
+}
+static inline string stripNonHex(const string &tok)
+{
+	string out;
+	for (char c : tok)
+		if (isHexChar(c))
+			out.push_back(c);
+	return out;
+}
+static inline int32_t signExtend(uint32_t val, int bits)
+{
+	// sign extend 'bits' bits in val into 32-bit signed int
+	uint32_t mask = 1u << (bits - 1);
+	if (val & mask)
+	{
+		uint32_t extend = (~0u) << bits;
+		return (int32_t)(val | extend);
+	}
+	else
+	{
+		return (int32_t)val;
+	}
+}
+
+// Aux function to parse an input file
+vector<uint8_t> parseInputFile(const string &path)
+{
+	ifstream ifs(path);
+	if (!ifs)
+	{
+		cerr << "Error: could not open input file: " << path << "\n";
+		exit(1);
+	}
+	vector<uint8_t> bytes;
+	string tok;
+	while (ifs >> tok)
+	{
+		string hx = stripNonHex(tok);
+		if (hx.empty())
+			continue;
+		// Some tokens might be long like 09a06293 (instruction), or single bytes '93'
+		if (hx.size() == 8)
+		{
+			// treat as 4 bytes hex representing 32-bit instruction; token likely in big-endian text
+			// We must push bytes in little-endian order (low-order byte first).
+			// hx e.g. "09a06293" -> bytes: 0x93,0x62,0xa0,0x09
+			for (int i = 6; i >= 0; i -= 2)
+			{
+				string byteStr = hx.substr(i, 2);
+				uint8_t b = (uint8_t)parseHex(byteStr);
+				bytes.push_back(b);
+			}
+		}
+		else if (hx.size() == 4)
+		{
+			// treat as two bytes; push as little-endian (low-order first)
+			// e.g. "6293" -> bytes 0x93,0x62
+			string b0 = hx.substr(2, 2);
+			string b1 = hx.substr(0, 2);
+			bytes.push_back((uint8_t)parseHex(b0));
+			bytes.push_back((uint8_t)parseHex(b1));
+		}
+		else
+		{
+			// length 1..2 etc -- parse as byte (pad if single digit)
+			if (hx.size() == 1)
+				hx = "0" + hx;
+			// if hx longer than 2 (e.g., '00000000') but not 4/8 handled above, we chunk it into pairs from end
+			if (hx.size() > 2)
+			{
+				// chunk from end in pairs
+				int len = (int)hx.size();
+				// push bytes in natural order if hx is already one-byte per token? Better safe:
+				// take last two, then previous two...
+				for (int i = len - 2; i >= 0; i -= 2)
+				{
+					string bs = hx.substr(i, 2);
+					uint8_t b = (uint8_t)parseHex(bs);
+					bytes.push_back(b);
+				}
+			}
+			else
+			{
+				uint8_t b = (uint8_t)parseHex(hx);
+				bytes.push_back(b);
+			}
+		}
+	}
+	return bytes;
+}
 
 /*
 Put/Define any helper function/definitions you need here
@@ -31,269 +149,32 @@ unsigned char hexCharToByte(char c)
 	return 0;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char **argv)
 {
-	/* This is the front end of your project.
-	You need to first read the instructions that are stored in a file and load them into an instruction memory.
-	*/
-
-	/* Each cell should store 1 byte. You can define the memory either dynamically, or define it as a fixed size with size 4KB (i.e., 4096 lines). Each instruction is 32 bits (i.e., 4 lines, saved in little-endian mode).
-	Each line in the input file is stored as an hex and is 1 byte (each four lines are one instruction). You need to read the file line by line and store it into the memory. You may need a mechanism to convert these values to bits so that you can read opcodes, operands, etc.
-	*/
-
-	char instMem[4096];
-
+	ios::sync_with_stdio(false);
+	cin.tie(nullptr);
 	if (argc < 2)
 	{
-		// cout << "No file name entered. Exiting...";
-		return -1;
+		cerr << "Not enough args" << endl;
+		return 1;
 	}
 
-	ifstream infile(argv[1]); // open the file
-	if (!(infile.is_open() && infile.good()))
-	{
-		cout << "error opening file\n";
-		return 0;
-	}
+	string path = argv[1];
 
-	string line;
-	int i = 0;
-	while (infile)
-	{
-		infile >> line;
-		stringstream line2(line);
-		char x;
-		line2 >> x;
-		instMem[i] = x; // be careful about hex
-		i++;
-		line2 >> x;
-		instMem[i] = x; // be careful about hex
-		//cout << instMem[i] << endl;
-		i++;
-	}
-	int maxPC = i / 4;
-	/*
-	string line;
-	int i = 0;
-	while (infile)
-	{
-		infile >> line;
-		if (line.empty())
-			continue; // skip empty lines
+	vector<uint8_t> programBytes = parseInputFile(path); // Parse file
 
-		unsigned int val;
-		stringstream line2(line);
-		line2 >> hex >> val; // convert ASCII hex to numeric byte
+	// Initialize CPU and run program
+	CPU cpu;
+	cpu.loadBytes(programBytes);
+	cpu.runCycle();
 
-		instMem[i] = static_cast<unsigned char>(val & 0xFF);
-		//cout << "Loaded byte " << i << ": 0x" << hex << val << dec << endl;
-		i++;
-	}*/
-	//int maxPC = i / 4;
+	// Get results
 
-	for (int pc = 0; pc < maxPC; ++pc) {
-        int idx = pc * 8;
-        unsigned char bytes[4];
+	int32_t a0 = cpu.getRegister(10);
+	int32_t a1 = cpu.getRegister(11);
 
-        // convert each pair of ASCII chars to a numeric byte
-        for (int i = 0; i < 4; ++i) {
-            bytes[i] = (hexCharToByte(instMem[idx + 2*i]) << 4) | hexCharToByte(instMem[idx + 2*i + 1]);
-        }
+	// Print, and we are done!
 
-        // assemble into 32-bit instruction (little-endian)
-        uint32_t instr32 =
-            (uint32_t)bytes[0] |
-            ((uint32_t)bytes[1] << 8) |
-            ((uint32_t)bytes[2] << 16) |
-            ((uint32_t)bytes[3] << 24);
-
-        bitset<32> instructionBits(instr32);
-
-        //cout << "Instruction " << pc << ": 0x" << hex << instr32 << "  " << instructionBits << endl;
-		
-    }
-
-	for (int j = 0; j < i; j++)
-	{
-		//cout << "Hello " << (unsigned char)instMem[j] << endl;
-	}
-
-	/* Instantiate your CPU object here.  CPU class is the main class in this project that defines different components of the processor.
-	CPU class also has different functions for each stage (e.g., fetching an instruction, decoding, etc.).
-	*/
-
-	CPU myCPU; // call the approriate constructor here to initialize the processor...
-	// make sure to create a variable for PC and resets it to zero (e.g., unsigned int PC = 0);
-	unsigned int PC = 0;
-	ControlUnit controlUnit;
-	ALU alu1; // ALU that is between registers and data memory
-	ALU alu2; // ALU that is used for branch calculations
-	ALU alu3; // ALU that is used to calculate the new PC value when a jump instruction is encountered
-
-	MUX mux1; // MUX that selects between immediate and register value for ALU input
-	MUX mux2; // MUX that selects between ALU result and data memory output for writing
-	MUX mux3; // MUX that selects between PC+4 and branch target for next PC value
-
-	int funct7, funct3, rs1, rs2, rd, opcode;
-	int regWrite, ALUSrc, MemRead, MemWrite, MemtoReg, Branch, size;
-
-	int ALUOp;
-
-	/* OPTIONAL: Instantiate your Instruction object here. */
-	// instruction myInst;
-
-	bool done = true;
-	while (done == true) // processor's main loop. Each iteration is equal to one clock cycle.
-	{
-		// fetch
-
-		unsigned long PC = myCPU.readPC();
-
-		if (PC * 4 + 3 >= 4096)
-		{
-			cerr << "PC out of bounds" << endl;
-			break;
-		}
-
-		int idx = PC * 8;
-        unsigned char bytes[4];
-
-        // convert each pair of ASCII chars to a numeric byte
-        for (int i = 0; i < 4; ++i) {
-            bytes[i] = (hexCharToByte(instMem[idx + 2*i]) << 4) | hexCharToByte(instMem[idx + 2*i + 1]);
-        }
-
-        // assemble into 32-bit instruction (little-endian)
-        uint32_t instr32 =
-            (uint32_t)bytes[0] |
-            ((uint32_t)bytes[1] << 8) |
-            ((uint32_t)bytes[2] << 16) |
-            ((uint32_t)bytes[3] << 24);
-
-        bitset<32> instruction(instr32);
-
-        //cout << "Instruction " << PC << ": 0x" << hex << instr32 << "  " << instruction << endl;
-
-		ControlSignals signals = controlUnit.getSignals(instruction); // Got the control signals
-		InstructionInfo info = myCPU.decode(instruction);			  // Decoded the instruction
-
-		string instrName = info.instruction_name;
-		uint32_t rdName = info.write_register;
-		uint32_t rs1Name = info.read_register1;
-		uint32_t rs2Name = info.read_register2;
-		int32_t imm = info.immediate;
-
-		regWrite = signals.RegWrite; //Load the control signals into variables
-		ALUSrc = signals.ALUSrc;
-		MemRead = signals.MemRead;
-		MemWrite = signals.MemWrite;
-		MemtoReg = signals.MemtoReg;
-		ALUOp = signals.ALUOp;
-		Branch = signals.Branch;
-		size = signals.size;
-
-		/*
-
-		int32_t reg1 = myCPU.getRegister(rs1Name);
-		int32_t reg2 = myCPU.getRegister(rs2Name);
-
-		int32_t aluB = mux1.select(ALUSrc, reg2, imm);
-
-		int32_t aluResult = alu1.compute(ALUOp, reg1, aluB);
-
-		int32_t memData = 0;
-
-		if (MemRead) {
-			if (size == 0b00) {
-				memData = myCPU.loadByte(aluResult);
-			} else if (size == 0b10) {
-				memData = myCPU.loadWord(aluResult);
-			}
-		}
-
-		if (MemWrite) {
-			if (size == 0b01) {
-				myCPU.storeHalfWord(aluResult, reg2);
-			} else if (size == 0b10) {
-				myCPU.storeWord(aluResult, reg2);
-			}
-		}
-
-		if (regWrite) {
-			int32_t writeData = mux2.select(MemtoReg, aluResult, memData);
-			myCPU.setRegister(rdName, writeData);
-		}*/
-
-		
-		//cout << instrName << ", " << rdName << ", " << rs1Name << ", " << rs2Name << ", " << imm << endl;
-
-		//Begin cycle
-		int read_data1 = 0;
-		int read_data2 = 0;
-
-		int from_memory = 0;
-
-		if (rs1Name != -1) {
-			read_data1 = myCPU.getRegister(rs1Name);
-		}
-		if (rs2Name != -1) {
-			read_data2 = myCPU.getRegister(rs2Name);
-		}
-
-		int32_t alu_input1 = read_data1;
-		int32_t alu_input2 = mux1.select(ALUSrc, read_data2, imm);
-		int32_t alu_result;
-
-		if (instrName == "LUI") {
-			int alu_input1 = 12; //If LUI, shift immediate by 12 bits
-			alu_result = alu1.compute(ALUOp, alu_input2, alu_input1);
-		} else {
-			alu_result = alu1.compute(ALUOp, alu_input1, alu_input2);
-		}
-
-		//Now memory
-		
-		if (MemRead) {
-			if (size == 0b00) { // LBU
-				from_memory = myCPU.loadByte(alu_result);
-				cout << "Loaded from memory: " << alu_result << endl;
-			} else if (size == 0b10) { // LW
-				from_memory = myCPU.loadWord(alu_result);
-				cout << "Loaded from memory: " << alu_result << endl;
-			}
-		}
-
-		int32_t write_data = mux2.select(MemtoReg, alu_result, from_memory);
-
-		int32_t mem_write_data = read_data2;
-
-		
-		if (regWrite && rdName != -1) {
-			myCPU.setRegister(rdName, write_data);
-		}
-
-		if (MemWrite) {
-			if (size == 0b10) { // SW
-				myCPU.storeWord(alu_result, mem_write_data);
-				cout << "Stored to memory: " << alu_result << " value: " << mem_write_data << endl;
-			} else if (size == 0b01) { // SH
-				myCPU.storeHalfWord(alu_result, mem_write_data);
-				cout << "Stored to memory: " << alu_result << " value: " << mem_write_data << endl;
-			} 
-		}
-
-		
-		// ...
-		myCPU.incPC();
-		if (myCPU.readPC() > maxPC)
-			break;
-	}
-
-	cout << myCPU.getRegister(10) << " " << myCPU.getRegister(11) << endl;
-	int a0 = 0;
-	int a1 = 0;
-	// print the results (you should replace a0 and a1 with your own variables that point to a0 and a1)
-	cout << "(" << myCPU.getRegister(10) << "," << myCPU.getRegister(11) << ")" << endl;
-
+	cout << "(" << a0 << "," << a1 << ")\n";
 	return 0;
 }

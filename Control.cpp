@@ -10,44 +10,30 @@ using namespace std;
 
 // I, U, R, S, B Types
 
-ControlSignals ControlUnit::getSignals(const std::bitset<32> instr)
+//Function to set control signals based on opcode
+
+ControlSignals ControlUnit::getSignals(uint8_t opcode)
 {
-    uint8_t opcode = instr.to_ulong() & 0x7F; // Extract opcode (bits 0-6)
-    ControlSignals signals = {};
+    ControlSignals signals;
 
     uint8_t funct3, funct7;
 
     switch (opcode)
     {
-    case 0b0110011:                                      // SRA, SUB, AND
-        funct3 = (instr.to_ulong() >> 12) & 0x7; // bits 12-14
+    case 0x33: // R-type: and, sub, sra
 
         signals.RegWrite = true;
-        signals.ALUSrc = false;
         signals.MemRead = false;
         signals.MemWrite = false;
         signals.MemtoReg = false;
+        signals.ALUSrc = false; // second operand from reg
         signals.Branch = false;
-        signals.size = 0b11;
+        signals.jalr = false;
+        signals.ALUOp = 2; // R-type
+        signals.isLui = false;
 
-        switch (funct3)
-        {
-        case 0b101: // SRA
-            // handle
-            signals.ALUOp = 0b100; // R-type operation
-            break;
-        case 0b000: // SUB
-            // handle
-            signals.ALUOp = 0b001; // R-type operation
-            break;
-        case 0b111: // AND
-            // handle
-            signals.ALUOp = 0b010; // R-type operation
-            break;
-        }
-    break;
-    case 0b0010011:                                        // ADDI, ORI, SLTIU
-        funct3 = (instr.to_ulong() >> 12) & 0x7; // bits 12-14
+        break;
+    case 0x13: // ADDI, ORI, SLTIU
 
         signals.RegWrite = true;
         signals.ALUSrc = true;
@@ -55,96 +41,76 @@ ControlSignals ControlUnit::getSignals(const std::bitset<32> instr)
         signals.MemWrite = false;
         signals.MemtoReg = false;
         signals.Branch = false;
-        signals.size = 0b11;
+        signals.jalr = false;
+        signals.ALUOp = 3;
+        signals.isLui = false;
 
-        switch (funct3)
-        {
-        case 0b000:               // ADDI
-            signals.ALUOp = 0b000; // I-type operation
-            break;
-        case 0b110:               // ORI
-            signals.ALUOp = 0b011; // I-type operation
-            break;
-        case 0b011:               // SLTIU
-            signals.ALUOp = 0b001; // I-type operation
-            break;
-        }
-    break; 
-    case 0b0000011: // LW, LBU
-        funct3 = (instr.to_ulong() >> 12) & 0x7; // bits 12-14
+        break;
+    case 0x03: // LW, LBU (LOAD instructions)
 
         signals.RegWrite = true;
-        signals.ALUSrc = true;
         signals.MemRead = true;
         signals.MemWrite = false;
         signals.MemtoReg = true;
+        signals.ALUSrc = true; // address = rs1 + imm
         signals.Branch = false;
-        signals.ALUOp = 0b000; // I-type operation
+        signals.jalr = false;
+        signals.ALUOp = 0; // ADD for address calc
+        signals.isLui = false;
 
-        switch (funct3)
-        {
-            case 0b010: // LW
-                signals.size = 0b10;
-            break;
-            case 0b100: // LBU
-                signals.size = 0b00;
-            break;
-        }
-    break;
-    case 0b0100011: // SW, SH
-        // funct3 can be used to differentiate between LW and LBU if needed  
-        funct3 = (instr.to_ulong() >> 12) & 0x7; // bits 12-14
+        break;
+    case 0x23: // SW, SH
+        // funct3 can be used to differentiate between LW and LBU if needed
 
         signals.RegWrite = false;
-        signals.ALUSrc = true;
         signals.MemRead = false;
-        signals.MemWrite = true; 
+        signals.MemWrite = true;
         signals.MemtoReg = false;
+        signals.ALUSrc = true; // address = rs1 + imm
         signals.Branch = false;
-        signals.ALUOp = 0b000; // S-type operation
+        signals.jalr = false;
+        signals.ALUOp = 0; // ADD
+        signals.isLui = false;
 
-        switch(funct3)
-        {
-            case 0b010: // SW
-                signals.size = 0b10;
-            break;
-            case 0b001: // SH
-                signals.size = 0b01;
-            break;
-        }
-
-    break;
-    case 0b1100011: // BNE
-        funct3 = (instr.to_ulong() >> 12) & 0x7; // bits 12-14
+        break;
+    case 0x63: // BNE
 
         signals.RegWrite = false;
+        signals.MemRead = false;
+        signals.MemWrite = false;
+        signals.MemtoReg = false;
         signals.ALUSrc = false;
-        signals.MemRead = false;
-        signals.MemWrite = false;
-        signals.MemtoReg = false;
         signals.Branch = true;
-        signals.ALUOp = 0b001; // B-type operation
-    break;
-    case 0b1100111: // JALR
+        signals.jalr = false;
+        signals.ALUOp = 1; // SUB for comparison
+        signals.isLui = false;
+        break;
+    case 0x67: // JALR
         signals.RegWrite = true;
-        signals.ALUSrc = true;
         signals.MemRead = false;
         signals.MemWrite = false;
         signals.MemtoReg = false;
-        signals.Branch = false;
-        signals.ALUOp = 0b000; // I-type operation
-    break;
-    case 0b0110111: //LUI
-        signals.RegWrite = true;
         signals.ALUSrc = true;
+        signals.Branch = false;
+        signals.jalr = true;
+        signals.ALUOp = 0; // ADD for address calc
+        signals.isLui = false;
+        break;
+    case 0x37: // LUI
+        signals.RegWrite = true;
         signals.MemRead = false;
         signals.MemWrite = false;
         signals.MemtoReg = false;
+        signals.ALUSrc = true;
         signals.Branch = false;
-        signals.ALUOp = 0b101;
-        signals.size = 0b11;
+        signals.jalr = false;
+        signals.ALUOp = 0;
+        signals.isLui = true;
+        break;
+    default:
+        // NOP or unsupported instruction
         break;
     }
 
-    return signals;
-}   
+    return signals; //Return signals
+}

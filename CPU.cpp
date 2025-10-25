@@ -1,11 +1,228 @@
 #include "CPU.h"
 
-CPU::CPU()
+//Class that defines CPU
+
+//Helper function for sign extension
+
+static inline int32_t signExtend(uint32_t val, int bits)
 {
-	PC = 0;						   // set PC to 0
-	for (int i = 0; i < 4096; i++) // copy instrMEM
+	// sign extend 'bits' bits in val into 32-bit signed int
+	uint32_t mask = 1u << (bits - 1);
+	if (val & mask)
 	{
-		dmemory[i] = (0);
+		uint32_t extend = (~0u) << bits;
+		return (int32_t)(val | extend);
+	}
+	else
+	{
+		return (int32_t)val;
+	}
+}
+
+
+
+//Extracting immediate in I type
+int32_t immI(uint32_t instr) {
+    uint32_t imm = (instr >> 20) & 0xFFF;
+    return signExtend(imm, 12);
+}
+
+//Extracting immediate in S type
+int32_t immS(uint32_t instr) {
+    uint32_t imm4_0 = (instr >> 7) & 0x1F;
+    uint32_t imm11_5 = (instr >> 25) & 0x7F;
+    uint32_t imm = (imm11_5 << 5) | imm4_0;
+    return signExtend(imm, 12);
+}
+
+//Extracting immediate in B type
+int32_t immB(uint32_t instr) {
+    // imm[12|10:5|4:1|11] << 1
+    uint32_t imm11 = (instr >> 7) & 0x1;           // bit 7
+    uint32_t imm4_1 = (instr >> 8) & 0xF;          // 8..11
+    uint32_t imm10_5 = (instr >> 25) & 0x3F;       // 25..30
+    uint32_t imm12 = (instr >> 31) & 0x1;          // bit 31
+    uint32_t imm = (imm12 << 12) | (imm11 << 11) | (imm10_5 << 5) | (imm4_1 << 1);
+    return signExtend(imm, 13);
+}
+
+//Extracting immediate in U type
+int32_t immU(uint32_t instr) {
+    uint32_t imm = instr & 0xFFFFF000u;
+    return (int32_t)imm; // already shifted in U-type encoding (upper 20 bits)
+}
+
+//Extracting immediate in J type
+int32_t immJ(uint32_t instr) {
+    // not needed for JAL, but implement if needed
+    uint32_t imm20 = (instr >> 31) & 0x1;
+    uint32_t imm10_1 = (instr >> 21) & 0x3FF;
+    uint32_t imm11 = (instr >> 20) & 0x1;
+    uint32_t imm19_12 = (instr >> 12) & 0xFF;
+    uint32_t imm = (imm20 << 20) | (imm19_12 << 12) | (imm11 << 11) | (imm10_1 << 1);
+    return signExtend(imm, 21);
+}
+
+
+
+CPU::CPU(): mem(), controlUnit(), aluControl(), PC(0)
+{
+}
+
+//Function to run the cycle
+void CPU::runCycle() {
+
+	uint32_t curr_pc = 0; //Initialize current PC to 0
+
+	while (true) {
+		uint32_t instr = mem.readWord(curr_pc); //Get instruction at pc.
+		uint8_t opcode = instr & 0x7F; //Get opcode from instruction
+
+		if (opcode == 0) { //If its 0 then we are done
+			break; // NOPE OR END OF PROGRAM
+		}
+
+		//Extract the fields
+		uint32_t rd = (instr >> 7) & 0x1F;
+		uint32_t funct3 = (instr >> 12) & 0x7;
+		uint32_t rs1 = (instr >> 15) & 0x1F;
+		uint32_t rs2 = (instr >> 20) & 0x1F;
+		uint32_t funct7 = (instr >> 25) & 0x7F;
+
+		//Set the signals using controlUnit
+
+		ControlSignals signals = controlUnit.getSignals(opcode);
+
+		//Next_pc by default is curr + 4
+		ALU default_next_pc_calculator;
+
+		ALUResult res = default_next_pc_calculator.operate(ALU_ADD, curr_pc, 4); //Adder is ALU with addition operation preset
+		uint32_t next_pc = res.result;
+
+		//uint32_t next_pc = curr_pc + 4;
+
+		//Calculate possible immediate candidates for each instruction type
+
+		//Immediate generation (Note all formats are generated and then correct ones are used throughout)
+		int32_t imm_i = immI(instr);
+		int32_t imm_s = immS(instr);
+		int32_t imm_b = immB(instr);
+		int32_t imm_u = immU(instr);
+		int32_t imm_j = immJ(instr);
+
+		//Read register values
+
+		int32_t rv1 = getRegister(rs1);
+		int32_t rv2 = getRegister(rs2);
+
+		int32_t alu_in1 = rv1; //ALU arg 1 is read register 1
+
+		MUX	alu_mux;
+
+		int32_t alu_in2 = alu_mux.select(signals.ALUSrc, rv2, 0); //ALU arg 2 is either immediate or read register 2 depending on ALUSrc
+
+		if (signals.ALUSrc) { //If ALUSrc is active we need to get the immediate
+			switch (opcode) {
+				case 0x13: //I - type instructions
+				case 0x03:
+				case 0x67:
+					alu_in2 = imm_i;
+					break;
+				case 0x23: //S - type
+					alu_in2 = imm_s;
+					break;
+				case 0x37: //LUI
+					alu_in2 = imm_u;
+					break;
+				default:
+					alu_in2 = imm_i;
+
+			}
+		}
+
+		//Set the operation based on what ALUOp dictates
+		ALUOps alu_op = aluControl.getALUControl(signals.ALUOp, (uint8_t) funct3, (uint8_t) funct7);
+
+		int32_t alu_result = 0;
+
+		bool alu_zero = false;
+
+		//If an LUI instructino is detected
+		if (signals.isLui) {
+			alu_result = imm_u; //Simply make the result the immediate by making the ALU transparent
+			alu_zero = (alu_result == 0);
+		} else {
+			//Conduct operation on ALU inputs and note the result and whether it is 0
+			ALUResult ar = ALU::operate(alu_op, alu_in1, alu_in2); 
+			alu_result = ar.result;
+			alu_zero = ar.zero;
+		}
+
+		int32_t mem_load_value = 0;
+
+		//If we need to read memory
+
+		if (signals.MemRead) {
+			uint32_t addr;
+			uint32_t w;
+			uint8_t b;
+			switch (funct3) {
+				case 0x2: //load word
+					addr = (uint32_t)alu_result;
+					w = mem.readWord(addr);
+					mem_load_value = (int32_t)w;
+					break;
+				case 0x4: //load byte unsigned
+					addr = (uint32_t)alu_result;
+					b = mem.readByte(addr);
+					mem_load_value = (int32_t)((uint32_t)b);
+					break;
+				default:
+					mem_load_value = 0;
+			}
+		} else if (signals.MemWrite) { //If we need to write to memory
+			uint32_t addr = (uint32_t)alu_result;
+			uint32_t w;
+			uint16_t h;
+
+			switch (funct3) {
+				case 0x2: //Store word
+					w = (uint32_t) rv2;
+					mem.writeWord(addr, w);
+					break;
+				case 0x1: //Store half word
+					h = (uint16_t) (rv2 & 0xFFFF);
+					mem.writeHalf(addr, h);
+					break;
+				default:
+				 	break;
+			}
+		}
+
+		if (signals.RegWrite) { //If we need to write back to the register file
+			int32_t writeVal = 0;
+
+			MUX normal_or_jalr; //MUX to choose between normal choice (non jalr) and jalr choice (putting return address in register)
+			MUX write_back_decider; //MUX to decide between alu result and memory load value to write back.
+
+			writeVal = write_back_decider.select(signals.MemtoReg, alu_result, mem_load_value); //Decides between ALU result and value loaded from memory based on MemtoReg Signal
+			writeVal = normal_or_jalr.select(signals.jalr, writeVal, int32_t ((int64_t) next_pc)); //Decides between previous two options and jalr return value based on jalr signal
+
+			//Set the corresponding register to the value
+			setRegister(rd, writeVal);
+		}
+	
+		MUX default_or_targ_decider; //MUX to choose between branch target or normal next pc
+
+		//Set next_pc to normal next pc or branch target based on whether Branch signal is active and ALU result is not 0 (because BNE)
+		next_pc = default_or_targ_decider.select(signals.Branch && !alu_zero, curr_pc+4, (uint32_t) ((int32_t) curr_pc + imm_b));
+		
+		MUX is_it_jump; //MUX to decide between branch target/normal next pc and jump target
+
+		next_pc = is_it_jump.select(signals.jalr, next_pc, alu_result & ~1u); //Decide between branch/normal and jump target based on jalr signal.
+
+		//Update curr_pc
+		curr_pc = next_pc;
 	}
 }
 
@@ -23,164 +240,7 @@ void CPU::setPC(unsigned long newPC)
 	PC = newPC;
 }
 
-// Implements the RISC-V ADDI instruction: rd = rs + imm
-void CPU::ADDI(int rd, int rs, int imm)
-{
-	if (rd < 0 || rd >= 32 || rs < 0 || rs >= 32)
-	{
-		cerr << "Register index out of bounds in ADDI" << endl;
-		return;
-	}
-	registers[rd] = registers[rs] + imm;
-}
 
-// Implements the RISC-V AND instruction: rd = rs1 & rs2
-void CPU::AND(int rd, int rs1, int rs2)
-{
-	if (rd < 0 || rd >= 32 || rs1 < 0 || rs1 >= 32 || rs2 < 0 || rs2 >= 32)
-	{
-		cerr << "Register index out of bounds in AND" << endl;
-		return;
-	}
-	registers[rd] = registers[rs1] & registers[rs2];
-}
-
-// Implements the RISC-V ORI instruction: rd = rs | imm
-void CPU::ORI(int rd, int rs, int imm)
-{
-	if (rd < 0 || rd >= 32 || rs < 0 || rs >= 32)
-	{
-		cerr << "Register index out of bounds in ORI" << endl;
-		return;
-	}
-	registers[rd] = registers[rs] | imm;
-}
-
-// Implements the SUB instruction: rd = rs1 - rs2
-void CPU::SUB(int rd, int rs1, int rs2)
-{
-	if (rd < 0 || rd >= 32 || rs1 < 0 || rs1 >= 32 || rs2 < 0 || rs2 >= 32)
-	{
-		cerr << "Register index out of bounds in SUB" << endl;
-		return;
-	}
-	registers[rd] = registers[rs1] - registers[rs2];
-}
-
-// Implements the SRA instruction: rd = rs1 >> rs2 (arithmetic right shift)
-void CPU::SRA(int rd, int rs1, int rs2)
-{
-	if (rd < 0 || rd >= 32 || rs1 < 0 || rs1 >= 32 || rs2 < 0 || rs2 >= 32)
-	{
-		cerr << "Register index out of bounds in SRA" << endl;
-		return;
-	}
-	int shiftAmount = registers[rs2];			   // RISC-V uses only the lower 5 bits for shift amount
-	registers[rd] = registers[rs1] >> shiftAmount; // Arithmetic right shift
-}
-
-void CPU::SLTIU(int rd, int rs, int imm)
-{
-	if (rd < 0 || rd >= 32 || rs < 0 || rs >= 32)
-	{
-		cerr << "Register index out of bounds in SLTIU" << endl;
-		return;
-	}
-	uint rs_val = static_cast<uint>(registers[rs]);
-	uint imm_val = static_cast<uint>(imm);
-
-	registers[rd] = (rs_val < imm_val) ? 1 : 0;
-}
-
-void CPU::LW(int rd, int rs1, int offset)
-{
-	if (rd < 0 || rd >= 32 || rs1 < 0 || rs1 >= 32)
-	{
-		cerr << "Register index out of bounds in LW" << endl;
-		return;
-	}
-	int address = registers[rs1] + offset;
-	if (address < 0 || address + 3 >= 4096)
-	{
-		cerr << "Memory access out of bounds in LW" << endl;
-		return;
-	}
-	// Load 4 bytes from memory and combine them into a single integer
-	registers[rd] = (dmemory[address] & 0xFF) |
-					((dmemory[address + 1] & 0xFF) << 8) |
-					((dmemory[address + 2] & 0xFF) << 16) |
-					((dmemory[address + 3] & 0xFF) << 24);
-}
-
-void CPU::SW(int rs2, int rs1, int offset)
-{
-	if (rs2 < 0 || rs2 >= 32 || rs1 < 0 || rs1 >= 32)
-	{
-		cerr << "Register index out of bounds in SW" << endl;
-		return;
-	}
-	int address = registers[rs1] + offset;
-	if (address < 0 || address + 3 >= 4096)
-	{
-		cerr << "Memory access out of bounds in SW" << endl;
-		return;
-	}
-	// Store the integer into 4 bytes in memory
-	dmemory[address] = registers[rs2] & 0xFF;
-	dmemory[address + 1] = (registers[rs2] >> 8) & 0xFF;
-	dmemory[address + 2] = (registers[rs2] >> 16) & 0xFF;
-	dmemory[address + 3] = (registers[rs2] >> 24) & 0xFF;
-}
-
-void CPU::LBU(int rd, int rs1, int offset)
-{
-	if (rd < 0 || rd >= 32 || rs1 < 0 || rs1 >= 32)
-	{
-		cerr << "Register index out of bounds in LBU" << endl;
-		return;
-	}
-	int address = registers[rs1] + offset;
-	if (address < 0 || address >= 4096)
-	{
-		cerr << "Memory access out of bounds in LBU" << endl;
-		return;
-	}
-	// Load a single byte from memory and zero-extend it to an integer
-	registers[rd] = dmemory[address] & 0xFF;
-}
-
-void CPU::BNE(int rs1, int rs2, int imm)
-{
-	if (rs1 < 0 || rs1 >= 32 || rs2 < 0 || rs2 >= 32)
-	{
-		cerr << "Register index out of bounds in BNE" << endl;
-		return;
-	}
-	if (registers[rs1] != registers[rs2])
-	{
-		PC += imm; // Branch by adding immediate to PC
-	}
-	else
-	{
-		PC++; // Increment PC normally if not branching
-	}
-}
-
-void CPU::JALR(int rd, int rs1, int offset)
-{
-	registers[rd] = PC + 1;
-	PC = (registers[rs1] + offset) & ~1;
-}
-
-void CPU::LUI(int rd, int imm)
-{
-	if (rd < 0 || rd >= 32)
-	{
-		cerr << "Register index out of bounds in LUI" << endl;
-		return;
-	}
-	registers[rd] = imm << 12; // Load upper immediate
-}
 
 InstructionInfo CPU::decode(bitset<32> instr)
 {
@@ -198,7 +258,7 @@ InstructionInfo CPU::decode(bitset<32> instr)
 
 		info.read_register1 = (instr.to_ulong() >> 15) & 0x1F; // Get read_register1
 		info.read_register2 = (instr.to_ulong() >> 20) & 0x1F; // Get read_register2
-		info.write_register = (instr.to_ulong() >> 7) & 0x1F;	 // Get write_register
+		info.write_register = (instr.to_ulong() >> 7) & 0x1F;  // Get write_register
 		switch (funct3)
 		{
 		case 0b101: // SRA
@@ -224,13 +284,16 @@ InstructionInfo CPU::decode(bitset<32> instr)
 		funct3 = (instr.to_ulong() >> 12) & 0x7;
 
 		info.read_register1 = (instr.to_ulong() >> 15) & 0x1F; // Get read_register1
-		info.write_register = (instr.to_ulong() >> 7) & 0x1F;	 // Get write_register
-		imm = (instr.to_ulong() >> 20) & 0xFFF;		 // Get immediate
+		info.write_register = (instr.to_ulong() >> 7) & 0x1F;  // Get write_register
+		/*
+		imm = (instr.to_ulong() >> 20) & 0xFFF;	// Get immediate
 
-		if (imm & 0x800) {
+		if (imm & 0x800)
+		{
 			imm |= 0xFFFFF000;
-		}
-		info.immediate = imm;
+		}*/
+
+		info.immediate = immI(instr.to_ulong());
 
 		switch (funct3)
 		{
@@ -248,51 +311,55 @@ InstructionInfo CPU::decode(bitset<32> instr)
 			break;
 		}
 		break;
-	case 0b0000011: // LW, LBU
+	case 0b0000011:								 // LW, LBU
 		funct3 = (instr.to_ulong() >> 12) & 0x7; // bits 12-14
 
 		info.read_register1 = (instr.to_ulong() >> 15) & 0x1F;
-		info.write_register = (instr.to_ulong() >> 7)& 0x1F;
+		info.write_register = (instr.to_ulong() >> 7) & 0x1F;
+		/*
 		imm = (instr.to_ulong() >> 20) & 0xFFF;
 
-		if (imm & 0x800) {
+		if (imm & 0x800)
+		{
 			imm |= 0xFFFFF000;
-		}
+		}*/
 
-		info.immediate = imm;
+		info.immediate = immI(instr.to_ulong());
 
 		switch (funct3)
 		{
-			case 0b010:
-				info.instruction_name = "LW";
+		case 0b010:
+			info.instruction_name = "LW";
 			break;
-			case 0b100:
-				info.instruction_name = "LBU";
+		case 0b100:
+			info.instruction_name = "LBU";
 			break;
 		}
 
 		break;
-	case 0b0100011: // SW, SH
-					// funct3 can be used to differentiate between LW and LBU if needed
+	case 0b0100011:								 // SW, SH
+												 // funct3 can be used to differentiate between LW and LBU if needed
 		funct3 = (instr.to_ulong() >> 12) & 0x7; // bits 12-14
 
 		info.read_register1 = (instr.to_ulong() >> 15) & 0x1F;
 		info.read_register2 = (instr.to_ulong() >> 20) & 0x1F;
+		/*
 		imm = ((instr.to_ulong()) >> 7) & 0x1F;
 		imm |= ((instr.to_ulong() >> 25) & 0x7F) << 5;
-		if (imm & 0x800) {
+		if (imm & 0x800)
+		{
 			imm |= 0xFFFFF000;
-		}
+		}*/
 
-		info.immediate = imm;
+		info.immediate = immS(instr.to_ulong());
 
 		switch (funct3)
 		{
-			case 0b010:
-				info.instruction_name = "SW";
+		case 0b010:
+			info.instruction_name = "SW";
 			break;
-			case 0b001:
-				info.instruction_name = "SH";
+		case 0b001:
+			info.instruction_name = "SH";
 		}
 		break;
 
@@ -301,36 +368,45 @@ InstructionInfo CPU::decode(bitset<32> instr)
 
 		info.read_register1 = instr.to_ulong() >> 15 & 0x1F;
 		info.read_register2 = instr.to_ulong() >> 20 & 0x1F;
+		/*
 		imm = ((instr.to_ulong()) >> 7) & 0x1E;
 		imm |= (((instr.to_ulong()) >> 25) & 0x3F) << 5;
 		imm |= (((instr.to_ulong()) >> 31) & 0x1) << 11;
 		imm |= (((instr.to_ulong()) >> 7) & 0x1) << 12;
 		if (imm & 0x1000) {
 			imm |= 0xFFFFE000;
-		}
-		info.immediate = imm;
+		}*/
+		info.immediate = immB(instr.to_ulong());
 
 		break;
 	case 0b1100111: // JALR
 		info.instruction_name = "JALR";
 
 		info.read_register1 = (instr.to_ulong() >> 15) & 0x1F; // Get read_register1
-		info.write_register = (instr.to_ulong() >> 7) & 0x1F;	 // Get write_register
-		imm = (instr.to_ulong() >> 20) & 0xFFF;		 // Get immediate
-
-		if (imm & 0x800) {
+		info.write_register = (instr.to_ulong() >> 7) & 0x1F;  // Get write_register
+		//imm = (instr.to_ulong() >> 20) & 0xFFF;				   // Get immediate
+		/*
+		if (imm & 0x800)
+		{
 			imm |= 0xFFFFF000;
-		}
-		info.immediate = imm;
+		}*/
+		info.immediate = immI(instr.to_ulong());
 
-		break;	
+		break;
 	case 0b0110111:
 		info.instruction_name = "LUI";
 
-		info.write_register = (instr.to_ulong() >> 7) & 0x1F;	 // Get write_register
+		info.write_register = (instr.to_ulong() >> 7) & 0x1F; // Get write_register
 		imm = (instr.to_ulong() >> 12) & 0xFFFFF;
 
 		info.immediate = imm;
+		break;
+	default:
+		info.read_register1 = -1;
+		info.read_register2 = -1;
+		info.write_register = -1;
+		info.immediate = 0;
+		info.instruction_name = "NOP";
 		break;
 	}
 
@@ -339,6 +415,10 @@ InstructionInfo CPU::decode(bitset<32> instr)
 
 int CPU::getRegister(int idx) const
 {
+	if (idx == 0)
+	{
+		return 0;
+	}
 	if (idx < 0 || idx >= 32)
 	{
 		cerr << idx << endl;
@@ -355,6 +435,12 @@ void CPU::setRegister(int idx, int value)
 		cerr << "Register index out of bounds in setRegister" << endl;
 		return;
 	}
+
+	if (idx == 0)
+	{
+		return; // x0 is hardwired to 0 in RISC-V
+	}
 	registers[idx] = value;
 }
 // Add other functions here ...
+
